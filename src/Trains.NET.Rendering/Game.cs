@@ -53,14 +53,19 @@ namespace Trains.NET.Rendering
             columns = Math.Max(columns, 1);
             rows = Math.Max(rows, 1);
 
-            (_width, _height) = _pixelMapper.CoordsToViewPortPixels(columns, rows);
+            (width, height) = _pixelMapper.CoordsToViewPortPixels(columns, rows);
 
-            _pixelMapper.SetViewPortSize(_width, _height);
+            if (width != _width || height != _height)
+            {
+                _width = width;
+                _height = height;
+                _pixelMapper.SetViewPortSize(_width, _height);
 
-            _gameBoard.Columns = columns;
-            _gameBoard.Rows = rows;
+                _gameBoard.Columns = columns;
+                _gameBoard.Rows = rows;
 
-            ResetBuffers();
+                ResetBuffers();
+            }
         }
 
         private void ResetBuffers()

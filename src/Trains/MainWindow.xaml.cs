@@ -58,6 +58,7 @@ namespace Trains
             SizeChanged += MainWindow_SizeChanged;
         }
 
+
         protected override void OnClosing(CancelEventArgs e)
         {
             if (MainFrame.Content is CometPage cometPage && cometPage.View is MainPage mainPage)

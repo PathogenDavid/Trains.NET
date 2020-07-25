@@ -6,5 +6,6 @@ namespace Trains.NET.Rendering
         void AdjustViewPortIfNecessary();
         void Render(ICanvas canvas);
         void SetSize(int width, int height);
+        void DrawFrame();
     }
 }

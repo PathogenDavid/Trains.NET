@@ -17,20 +17,22 @@ namespace Trains.NET.Rendering
         private readonly IEnumerable<ILayerRenderer> _boardRenderers;
         private readonly IPixelMapper _pixelMapper;
         private readonly IBitmapFactory _bitmapFactory;
+        private readonly IImageFactory _imageFactory;
         private readonly PerSecondTimedStat _skiaFps = InstrumentationBag.Add<PerSecondTimedStat>("Draw-FPS-Skia");
         private readonly ElapsedMillisecondsTimedStat _skiaDrawTime = InstrumentationBag.Add<ElapsedMillisecondsTimedStat>("Draw-Skia-AllUp");
         private readonly ElapsedMillisecondsTimedStat _skiaClearTime = InstrumentationBag.Add<ElapsedMillisecondsTimedStat>("Draw-Skia-Clear");
         private readonly ElapsedMillisecondsTimedStat _gameBufferReset = InstrumentationBag.Add<ElapsedMillisecondsTimedStat>("Draw-Game-BufferReset");
         private readonly Dictionary<ILayerRenderer, ElapsedMillisecondsTimedStat> _renderLayerDrawTimes;
         private readonly Dictionary<ILayerRenderer, ElapsedMillisecondsTimedStat> _renderCacheDrawTimes;
-        private readonly Dictionary<ILayerRenderer, IBitmap> _bitmapBuffer = new();
+        private readonly Dictionary<ILayerRenderer, IBitmap> _bitmapBuffer = new ();
 
-        public Game(IGameBoard gameBoard, OrderedList<ILayerRenderer> boardRenderers, IPixelMapper pixelMapper, IBitmapFactory bitmapFactory)
+        public Game(IGameBoard gameBoard, OrderedList<ILayerRenderer> boardRenderers, IPixelMapper pixelMapper, IBitmapFactory bitmapFactory, IImageFactory imageFactory)
         {
             _gameBoard = gameBoard;
             _boardRenderers = boardRenderers;
             _pixelMapper = pixelMapper;
             _bitmapFactory = bitmapFactory;
+            _imageFactory = imageFactory;
             _renderLayerDrawTimes = _boardRenderers.ToDictionary(x => x, x => InstrumentationBag.Add<ElapsedMillisecondsTimedStat>(GetLayerDiagnosticsName(x)));
             _renderCacheDrawTimes = _boardRenderers.Where(x => x is ICachableLayerRenderer).ToDictionary(x => x, x => InstrumentationBag.Add<ElapsedMillisecondsTimedStat>("Draw-Cache-" + x.Name.Replace(" ", "")));
             _pixelMapper.ViewPortChanged += (s, e) => _needsBufferReset = true;
@@ -40,7 +42,7 @@ namespace Trains.NET.Rendering
         {
             var sb = new StringBuilder("Draw-Layer-");
             sb.Append(layerRenderer.Name.Replace(" ", ""));
-            if(layerRenderer is ICachableLayerRenderer)
+            if (layerRenderer is ICachableLayerRenderer)
             {
                 sb.Append("[Cached]");
             }
@@ -72,7 +74,37 @@ namespace Trains.NET.Rendering
             _bitmapBuffer.Clear();
         }
 
+        private IImage _buffer;
+        private bool _isDrawing;
+        public void DrawFrame()
+        {
+            // if things get busy, we start dropping frames
+            if (_isDrawing) return;
+
+            if (_width == 0 || _height == 0) return;
+
+            _isDrawing = true;
+
+            using var image = _imageFactory.CreateImageCanvas(_width, _height);
+
+            DoRender(image.Canvas);
+
+            var oldBuffer = _buffer;
+            _buffer = image.Render();
+            oldBuffer?.Dispose();
+
+            _isDrawing = false;
+        }
+
         public void Render(ICanvas canvas)
+        {
+            if (_buffer != null)
+            {
+                canvas.DrawImage(_buffer, 0, 0);
+            }
+        }
+
+        private void DoRender(ICanvas canvas)
         {
             if (_width == 0 || _height == 0) return;
 

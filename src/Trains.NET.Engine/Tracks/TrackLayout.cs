@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 
 namespace Trains.NET.Engine.Tracks
 {
@@ -90,7 +91,7 @@ namespace Trains.NET.Engine.Tracks
 
         public IEnumerator<Track> GetEnumerator()
         {
-            foreach ((_, _, Track track) in _tracks)
+            foreach ((_, _, Track track) in _tracks.ToArray())
             {
                 yield return track;
             }

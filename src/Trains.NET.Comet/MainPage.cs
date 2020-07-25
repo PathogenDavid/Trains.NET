@@ -65,19 +65,24 @@ namespace Trains.NET.Comet
             };
 
             _gameTimer = gameTimer;
+            bool drawing = false;
             _gameTimer.Elapsed += (s, e) =>
             {
                 game.AdjustViewPortIfNecessary();
 
+                if (drawing) return;
+
                 controlDelegate.FlagDraw();
                 _miniMapDelegate.FlagDraw();
 
-                ThreadHelper.Run(async () =>
+                drawing = true;
+                ThreadHelper.RunAsync(async () =>
                 {
                     await ThreadHelper.SwitchToMainThreadAsync();
 
                     controlDelegate.Invalidate();
                     _miniMapDelegate.Invalidate();
+                    drawing = false;
                 });
             };
             _trackLayout = trackLayout;

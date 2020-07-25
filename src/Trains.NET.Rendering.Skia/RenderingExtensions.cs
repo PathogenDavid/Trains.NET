@@ -5,7 +5,7 @@ namespace Trains.NET.Rendering.Skia
 {
     public static class RenderingExtensions
     {
-        public static SKBitmap ToSkia(this IBitmap bitmap) => ((SKBitmapWrapper)bitmap).Bitmap;
+        public static SKPicture ToSkia(this IBitmap bitmap) => ((SKBitmapWrapper)bitmap).Picutre;
 
         public static SKColor ToSkia(this Color color) => color switch
         {

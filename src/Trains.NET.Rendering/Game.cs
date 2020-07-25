@@ -106,9 +106,10 @@ namespace Trains.NET.Rendering
                             bitmap = _bitmapFactory.CreateBitmap(_width, _height);
                         }
                         ICanvas layerCanvas = _bitmapFactory.CreateCanvas(bitmap);
-                        layerCanvas.Clear(Colors.Empty);
+//                        layerCanvas.Clear(Colors.Empty);
                         renderer.Render(layerCanvas, _width, _height);
                         _bitmapBuffer[renderer] = bitmap;
+                        _bitmapFactory.CloseCanvas(bitmap);
                         layerCanvas.Dispose();
                         _renderCacheDrawTimes[renderer].Stop();
                     }

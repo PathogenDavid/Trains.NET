@@ -4,5 +4,6 @@
     {
         IBitmap CreateBitmap(int width, int height);
         ICanvas CreateCanvas(IBitmap bitmap);
+        void CloseCanvas(IBitmap bitmap);
     }
 }

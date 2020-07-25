@@ -36,8 +36,7 @@ namespace Trains.NET.Rendering.Skia
         }
 
         public void DrawBitmap(IBitmap bitmap, int x, int y)
-            => _canvas.DrawPicture(bitmap.ToSkia(), x, y);
-
+            => _canvas.DrawImage(bitmap.ToSkia(), x, y);
 
         public void DrawCircle(float x, float y, float radius, PaintBrush paint)
             => _canvas.DrawCircle(x, y, radius, GetSKPaint(paint));

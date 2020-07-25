@@ -6,31 +6,33 @@ namespace Trains.NET.Rendering.Skia
     internal class SKBitmapWrapper : IBitmap, IDisposable
     {
         //private readonly SKBitmap _bitmap;
-        private SKPictureRecorder? _recorder;
 
         internal void CloseCanvas()
         {
-            _picture = _recorder?.EndRecording();
+            _image = _surface.Snapshot();
+            //_picture = _recorder?.EndRecording();
             _canvas?.Dispose();
             _canvas = null;
-            _recorder?.Dispose();
-            _recorder = null;
+            _surface?.Dispose();
+            _surface = null;
+            //_recorder?.Dispose();
+            //_recorder = null;
         }
 
+        private SKSurface _surface;
         private SKCanvas? _canvas;
-        private SKPicture? _picture;
-        private readonly int _width;
-        private readonly int _height;
+        private SKImage _image;
+        private readonly SKImageInfo _info;
 
         public SKBitmapWrapper(int width, int height)
         {
             //_bitmap = new SKBitmap(width, height, SKImageInfo.PlatformColorType, SKAlphaType.Premul);
 
-            _width = width;
-            _height = height;
+            _info = new SKImageInfo(width, height, SKImageInfo.PlatformColorType, SKAlphaType.Premul);
+
         }
 
-        public SKPicture? Picutre => _picture;
+        public SKImage? Image => _image;
 
         //public SKBitmap Bitmap => _bitmap;
 
@@ -38,10 +40,10 @@ namespace Trains.NET.Rendering.Skia
         {
             get
             {
-                if (_recorder == null)
+                if (_surface == null)
                 {
-                    _recorder = new SKPictureRecorder();
-                    _canvas = _recorder.BeginRecording(new SKRect(0, 0, _width, _height));
+                    _surface = SKSurface.Create(_info);
+                    _canvas = _surface.Canvas;
                 }
                 return _canvas!;
             }
@@ -51,8 +53,8 @@ namespace Trains.NET.Rendering.Skia
         {
          //   _bitmap?.Dispose();
             _canvas?.Dispose();
-            _recorder?.Dispose();
-            _picture?.Dispose();
+            _surface?.Dispose();
+            _image?.Dispose();
         }
     }
 }

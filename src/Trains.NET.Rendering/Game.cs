@@ -12,7 +12,6 @@ namespace Trains.NET.Rendering
     {
         private readonly object _bufferLock = new object();
         private IImage? _buffer;
-        private bool _isDrawing;
         private bool _needsBufferReset;
         private int _width;
         private int _height;
@@ -25,7 +24,6 @@ namespace Trains.NET.Rendering
         private readonly ElapsedMillisecondsTimedStat _skiaDrawTime = InstrumentationBag.Add<ElapsedMillisecondsTimedStat>("Draw-Skia-AllUp");
         private readonly ElapsedMillisecondsTimedStat _skiaClearTime = InstrumentationBag.Add<ElapsedMillisecondsTimedStat>("Draw-Skia-Clear");
         private readonly ElapsedMillisecondsTimedStat _gameBufferReset = InstrumentationBag.Add<ElapsedMillisecondsTimedStat>("Draw-Game-BufferReset");
-        private readonly CountStat _droppedFrames = InstrumentationBag.Add<CountStat>("Dropped frames");
         private readonly Dictionary<ILayerRenderer, ElapsedMillisecondsTimedStat> _renderLayerDrawTimes;
         private readonly Dictionary<ILayerRenderer, ElapsedMillisecondsTimedStat> _renderCacheDrawTimes;
         private readonly Dictionary<ILayerRenderer, IImage> _imageBuffer = new();
@@ -95,16 +93,7 @@ namespace Trains.NET.Rendering
             // Before we draw, move the viewport for follow mode
             AdjustViewPortIfNecessary();
 
-            // if things get busy, we start dropping frames
-            if (_isDrawing)
-            {
-                _droppedFrames.Add();
-                return;
-            }
-
             if (_width == 0 || _height == 0) return;
-
-            _isDrawing = true;
 
             using var image = _imageFactory.CreateImageCanvas(_width, _height);
 
@@ -124,8 +113,6 @@ namespace Trains.NET.Rendering
                 _needsBufferReset = false;
                 _gameBufferReset.Stop();
             }
-
-            _isDrawing = false;
         }
 
         public void Render(ICanvas canvas)
@@ -221,6 +208,7 @@ namespace Trains.NET.Rendering
         {
             _renderTimer.Dispose();
             _buffer?.Dispose();
+            _gameBoard.Dispose();
         }
     }
 }

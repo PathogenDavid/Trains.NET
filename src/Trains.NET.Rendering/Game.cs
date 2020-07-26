@@ -28,9 +28,10 @@ namespace Trains.NET.Rendering
         private readonly CountStat _droppedFrames = InstrumentationBag.Add<CountStat>("Dropped frames");
         private readonly Dictionary<ILayerRenderer, ElapsedMillisecondsTimedStat> _renderLayerDrawTimes;
         private readonly Dictionary<ILayerRenderer, ElapsedMillisecondsTimedStat> _renderCacheDrawTimes;
-        private readonly Dictionary<ILayerRenderer, IBitmap> _bitmapBuffer = new();
         private readonly Dictionary<ILayerRenderer, IImage> _imageBuffer = new();
         private readonly ITimer _renderTimer;
+
+        public const int RenderInterval = 16;
 
         public Game(IGameBoard gameBoard, OrderedList<ILayerRenderer> boardRenderers, IPixelMapper pixelMapper, IBitmapFactory bitmapFactory, IImageFactory imageFactory, ITimer renderTimer)
         {
@@ -43,7 +44,9 @@ namespace Trains.NET.Rendering
             _renderCacheDrawTimes = _boardRenderers.Where(x => x is ICachableLayerRenderer).ToDictionary(x => x, x => InstrumentationBag.Add<ElapsedMillisecondsTimedStat>("Draw-Cache-" + x.Name.Replace(" ", "")));
             _pixelMapper.ViewPortChanged += (s, e) => _needsBufferReset = true;
             _renderTimer = renderTimer;
+            _renderTimer.Interval = RenderInterval;
             _renderTimer.Elapsed += (s, e) => DrawFrame();
+            _renderTimer.Start();
         }
 
         private static string GetLayerDiagnosticsName(ILayerRenderer layerRenderer)
@@ -74,17 +77,12 @@ namespace Trains.NET.Rendering
                 _gameBoard.Columns = columns;
                 _gameBoard.Rows = rows;
 
-                ResetBuffers();
+                _needsBufferReset = true;
             }
         }
 
         private void ResetBuffers()
         {
-            foreach (IBitmap bitmap in _bitmapBuffer.Values)
-            {
-                bitmap.Dispose();
-            }
-            _bitmapBuffer.Clear();
             foreach (IImage image in _imageBuffer.Values)
             {
                 image.Dispose();
@@ -118,6 +116,14 @@ namespace Trains.NET.Rendering
                 _buffer = image.Render();
             }
             oldBuffer?.Dispose();
+
+            if (_needsBufferReset)
+            {
+                _gameBufferReset.Start();
+                ResetBuffers();
+                _needsBufferReset = false;
+                _gameBufferReset.Stop();
+            }
 
             _isDrawing = false;
         }
@@ -185,14 +191,6 @@ namespace Trains.NET.Rendering
                 canvas.Restore();
             }
             canvas.Restore();
-
-            if (_needsBufferReset)
-            {
-                _gameBufferReset.Start();
-                ResetBuffers();
-                _needsBufferReset = false;
-                _gameBufferReset.Stop();
-            }
 
             _skiaDrawTime.Stop();
             _skiaFps.Update();

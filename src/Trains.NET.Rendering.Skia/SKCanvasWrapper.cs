@@ -36,7 +36,7 @@ namespace Trains.NET.Rendering.Skia
         }
 
         public void DrawBitmap(IBitmap bitmap, int x, int y)
-            => _canvas.DrawBitmap(bitmap.ToSkia(), x, y);
+            => _canvas.DrawImage(bitmap.ToSkia(), x, y);
 
         public void DrawImage(IImage image, int x, int y)
             => _canvas.DrawImage(image.ToSkia(), x, y);

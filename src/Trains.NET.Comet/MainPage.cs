@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using Comet;
-using Comet.Skia;
 using Trains.NET.Engine;
 using Trains.NET.Engine.Tracks;
 using Trains.NET.Rendering;
@@ -22,6 +21,7 @@ namespace Trains.NET.Comet
         private readonly TrainsDelegate _controlDelegate;
         private readonly MiniMapDelegate _miniMapDelegate;
         private Size _lastSize = Size.Empty;
+        private bool _render = true;
 
         public MainPage(IGame game,
                         IPixelMapper pixelMapper,
@@ -67,9 +67,10 @@ namespace Trains.NET.Comet
                 }.FillHorizontal();
             };
 
-            RenderLoop();
             _trackLayout = trackLayout;
             _gameStorage = gameStorage;
+
+            _ = RenderLoop();
 
             void SwitchGameMode()
             {
@@ -81,9 +82,9 @@ namespace Trains.NET.Comet
             }
         }
 
-        async Task RenderLoop()
+        private async Task RenderLoop()
         {
-            while (true)
+            while (_render)
             {
                 _controlDelegate.FlagDraw();
                 _miniMapDelegate.FlagDraw();
@@ -91,7 +92,7 @@ namespace Trains.NET.Comet
                 _controlDelegate.Invalidate();
                 _miniMapDelegate.Invalidate();
 
-                await Task.Delay(TimeSpan.FromSeconds(1.0 / 60));
+                await Task.Delay(TimeSpan.FromSeconds(1.0 / 60)).ConfigureAwait(true);
             }
         }
 
@@ -163,6 +164,7 @@ namespace Trains.NET.Comet
         {
             if (disposing)
             {
+                _render = false;
                 _game.Dispose();
                 _miniMapDelegate.Dispose();
             }

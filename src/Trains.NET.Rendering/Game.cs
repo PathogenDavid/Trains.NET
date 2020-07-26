@@ -29,6 +29,7 @@ namespace Trains.NET.Rendering
         private readonly Dictionary<ILayerRenderer, ElapsedMillisecondsTimedStat> _renderLayerDrawTimes;
         private readonly Dictionary<ILayerRenderer, ElapsedMillisecondsTimedStat> _renderCacheDrawTimes;
         private readonly Dictionary<ILayerRenderer, IBitmap> _bitmapBuffer = new();
+        private readonly Dictionary<ILayerRenderer, IImage> _imageBuffer = new();
         private readonly ITimer _renderTimer;
 
         public Game(IGameBoard gameBoard, OrderedList<ILayerRenderer> boardRenderers, IPixelMapper pixelMapper, IBitmapFactory bitmapFactory, IImageFactory imageFactory, ITimer renderTimer)
@@ -62,14 +63,19 @@ namespace Trains.NET.Rendering
             columns = Math.Max(columns, 1);
             rows = Math.Max(rows, 1);
 
-            (_width, _height) = _pixelMapper.CoordsToViewPortPixels(columns, rows);
+            (width, height) = _pixelMapper.CoordsToViewPortPixels(columns, rows);
 
-            _pixelMapper.SetViewPortSize(_width, _height);
+            if (width != _width || height != _height)
+            {
+                _width = width;
+                _height = height;
+                _pixelMapper.SetViewPortSize(_width, _height);
 
-            _gameBoard.Columns = columns;
-            _gameBoard.Rows = rows;
+                _gameBoard.Columns = columns;
+                _gameBoard.Rows = rows;
 
-            ResetBuffers();
+                ResetBuffers();
+            }
         }
 
         private void ResetBuffers()
@@ -79,6 +85,11 @@ namespace Trains.NET.Rendering
                 bitmap.Dispose();
             }
             _bitmapBuffer.Clear();
+            foreach (IImage image in _imageBuffer.Values)
+            {
+                image.Dispose();
+            }
+            _imageBuffer.Clear();
         }
 
         public void DrawFrame()
@@ -148,23 +159,21 @@ namespace Trains.NET.Rendering
 
                 if (renderer is ICachableLayerRenderer cachable)
                 {
-                    if (cachable.IsDirty || !_bitmapBuffer.ContainsKey(renderer))
+                    if (cachable.IsDirty || !_imageBuffer.ContainsKey(renderer))
                     {
                         _renderCacheDrawTimes[renderer].Start();
-                        if (!_bitmapBuffer.TryGetValue(renderer, out IBitmap bitmap))
-                        {
-                            bitmap = _bitmapFactory.CreateBitmap(_width, _height);
-                        }
-                        ICanvas layerCanvas = _bitmapFactory.CreateCanvas(bitmap);
-                        layerCanvas.Clear(Colors.Empty);
-                        renderer.Render(layerCanvas, _width, _height);
-                        _bitmapBuffer[renderer] = bitmap;
-                        layerCanvas.Dispose();
+                        var imageCanvas = _imageFactory.CreateImageCanvas(_width, _height);
+
+                        renderer.Render(imageCanvas.Canvas, _width, _height);
+
+                        _imageBuffer[renderer] = imageCanvas.Render();
+
+                        imageCanvas.Dispose();
                         _renderCacheDrawTimes[renderer].Stop();
                     }
 
                     _renderLayerDrawTimes[renderer].Start();
-                    canvas.DrawBitmap(_bitmapBuffer[renderer], 0, 0);
+                    canvas.DrawImage(_imageBuffer[renderer], 0, 0);
                     _renderLayerDrawTimes[renderer].Stop();
                 }
                 else

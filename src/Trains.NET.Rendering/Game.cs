@@ -10,6 +10,9 @@ namespace Trains.NET.Rendering
 {
     internal class Game : IGame
     {
+        private readonly object _bufferLock = new object();
+        private IImage? _buffer;
+        private bool _isDrawing;
         private bool _needsBufferReset;
         private int _width;
         private int _height;
@@ -22,11 +25,13 @@ namespace Trains.NET.Rendering
         private readonly ElapsedMillisecondsTimedStat _skiaDrawTime = InstrumentationBag.Add<ElapsedMillisecondsTimedStat>("Draw-Skia-AllUp");
         private readonly ElapsedMillisecondsTimedStat _skiaClearTime = InstrumentationBag.Add<ElapsedMillisecondsTimedStat>("Draw-Skia-Clear");
         private readonly ElapsedMillisecondsTimedStat _gameBufferReset = InstrumentationBag.Add<ElapsedMillisecondsTimedStat>("Draw-Game-BufferReset");
+        private readonly CountStat _droppedFrames = InstrumentationBag.Add<CountStat>("Dropped frames");
         private readonly Dictionary<ILayerRenderer, ElapsedMillisecondsTimedStat> _renderLayerDrawTimes;
         private readonly Dictionary<ILayerRenderer, ElapsedMillisecondsTimedStat> _renderCacheDrawTimes;
-        private readonly Dictionary<ILayerRenderer, IBitmap> _bitmapBuffer = new ();
+        private readonly Dictionary<ILayerRenderer, IBitmap> _bitmapBuffer = new();
+        private readonly ITimer _renderTimer;
 
-        public Game(IGameBoard gameBoard, OrderedList<ILayerRenderer> boardRenderers, IPixelMapper pixelMapper, IBitmapFactory bitmapFactory, IImageFactory imageFactory)
+        public Game(IGameBoard gameBoard, OrderedList<ILayerRenderer> boardRenderers, IPixelMapper pixelMapper, IBitmapFactory bitmapFactory, IImageFactory imageFactory, ITimer renderTimer)
         {
             _gameBoard = gameBoard;
             _boardRenderers = boardRenderers;
@@ -36,6 +41,8 @@ namespace Trains.NET.Rendering
             _renderLayerDrawTimes = _boardRenderers.ToDictionary(x => x, x => InstrumentationBag.Add<ElapsedMillisecondsTimedStat>(GetLayerDiagnosticsName(x)));
             _renderCacheDrawTimes = _boardRenderers.Where(x => x is ICachableLayerRenderer).ToDictionary(x => x, x => InstrumentationBag.Add<ElapsedMillisecondsTimedStat>("Draw-Cache-" + x.Name.Replace(" ", "")));
             _pixelMapper.ViewPortChanged += (s, e) => _needsBufferReset = true;
+            _renderTimer = renderTimer;
+            _renderTimer.Elapsed += (s, e) => DrawFrame();
         }
 
         private static string GetLayerDiagnosticsName(ILayerRenderer layerRenderer)
@@ -74,12 +81,17 @@ namespace Trains.NET.Rendering
             _bitmapBuffer.Clear();
         }
 
-        private IImage _buffer;
-        private bool _isDrawing;
         public void DrawFrame()
         {
+            // Before we draw, move the viewport for follow mode
+            AdjustViewPortIfNecessary();
+
             // if things get busy, we start dropping frames
-            if (_isDrawing) return;
+            if (_isDrawing)
+            {
+                _droppedFrames.Add();
+                return;
+            }
 
             if (_width == 0 || _height == 0) return;
 
@@ -90,7 +102,10 @@ namespace Trains.NET.Rendering
             DoRender(image.Canvas);
 
             var oldBuffer = _buffer;
-            _buffer = image.Render();
+            lock (_bufferLock)
+            {
+                _buffer = image.Render();
+            }
             oldBuffer?.Dispose();
 
             _isDrawing = false;
@@ -98,9 +113,12 @@ namespace Trains.NET.Rendering
 
         public void Render(ICanvas canvas)
         {
-            if (_buffer != null)
+            lock (_bufferLock)
             {
-                canvas.DrawImage(_buffer, 0, 0);
+                if (_buffer != null)
+                {
+                    canvas.DrawImage(_buffer, 0, 0);
+                }
             }
         }
 
@@ -190,6 +208,12 @@ namespace Trains.NET.Rendering
                     break;
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            _renderTimer.Dispose();
+            _buffer?.Dispose();
         }
     }
 }

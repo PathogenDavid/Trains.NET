@@ -86,5 +86,8 @@ namespace Trains.NET.Rendering.Skia
 
         public void Translate(float x, float y)
             => _canvas.Translate(x, y);
+
+        public float MeasureText(string text, PaintBrush paint)
+            => GetSKPaint(paint).MeasureText(text);
     }
 }

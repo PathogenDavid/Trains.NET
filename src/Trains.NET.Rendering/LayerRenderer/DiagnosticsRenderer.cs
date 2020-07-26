@@ -1,4 +1,6 @@
-﻿using Trains.NET.Engine;
+﻿using System;
+using System.Collections.Generic;
+using Trains.NET.Engine;
 using Trains.NET.Instrumentation;
 
 namespace Trains.NET.Rendering
@@ -12,8 +14,13 @@ namespace Trains.NET.Rendering
             TextSize = 16,
             TextAlign = TextAlign.Left,
         };
+        private readonly PaintBrush _backgroundPaint = new PaintBrush
+        {
+            Color = Colors.White,
+            Style = PaintStyle.Fill
+        };
 
-        public bool Enabled { get; set; }
+        public bool Enabled { get; set; } = true;
 
         public string Name => "Diagnostics";
 
@@ -25,12 +32,23 @@ namespace Trains.NET.Rendering
         {
             int i = 1;
 
-            foreach((string name, IStat stat) in InstrumentationBag.Stats)
+            var strings = new List<string>();
+
+            float maxWidth = 0;
+            foreach ((string name, IStat stat) in InstrumentationBag.Stats)
             {
                 if (stat.ShouldShow())
                 {
-                    canvas.DrawText(name + ": " + stat.GetDescription(), 0, i++ * 25, _paint);
+                    var line = name + ": " + stat.GetDescription();
+                    strings.Add(line);
+                    maxWidth = Math.Max(maxWidth, canvas.MeasureText(line, _paint));
                 }
+            }
+
+            canvas.DrawRect(0, 0, maxWidth, strings.Count * 25, _backgroundPaint);
+            foreach (string line in strings)
+            {
+                canvas.DrawText(line, 0, i++ * 25, _paint);
             }
         }
     }

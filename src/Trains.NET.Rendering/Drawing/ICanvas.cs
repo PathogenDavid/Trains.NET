@@ -20,5 +20,6 @@ namespace Trains.NET.Rendering
         void DrawBitmap(IBitmap bitmap, int v1, int v2);
         void Scale(float scaleX, float scaleY);
         void DrawImage(IImage buffer, int x, int y);
+        float MeasureText(string text, PaintBrush paint);
     }
 }

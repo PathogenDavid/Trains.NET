@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using Comet;
+using Comet.Skia;
 using Trains.NET.Engine;
 using Trains.NET.Engine.Tracks;
 using Trains.NET.Rendering;
@@ -16,8 +18,9 @@ namespace Trains.NET.Comet
 
         private readonly ITrackLayout _trackLayout;
         private readonly IGameStorage _gameStorage;
+        private readonly IGame _game;
+        private readonly TrainsDelegate _controlDelegate;
         private readonly MiniMapDelegate _miniMapDelegate;
-        private readonly ITimer _gameTimer;
         private Size _lastSize = Size.Empty;
 
         public MainPage(IGame game,
@@ -29,12 +32,12 @@ namespace Trains.NET.Comet
                         ITrackParameters trackParameters,
                         ITrackLayout trackLayout,
                         IGameStorage gameStorage,
-                        ITimer gameTimer,
                         Factory<IToolPreviewer> previewerFactory)
         {
             this.Title("Trains - " + ThisAssembly.AssemblyInformationalVersion);
 
-            var controlDelegate = new TrainsDelegate(game, pixelMapper, previewerFactory);
+            _game = game;
+            _controlDelegate = new TrainsDelegate(game, pixelMapper, previewerFactory);
             _miniMapDelegate = new MiniMapDelegate(trackLayout, trackParameters, pixelMapper);
 
             this.Body = () =>
@@ -48,7 +51,7 @@ namespace Trains.NET.Comet
                         new Spacer(),
                         _configurationShown ?
                                 CreateConfigurationControls(layers) :
-                                CreateToolsControls(tools, controlDelegate, trainControls.BuildMode.Value),
+                                CreateToolsControls(tools, _controlDelegate, trainControls.BuildMode.Value),
                         new Spacer(),
                         _configurationShown || !trainControls.BuildMode ? null :
                             CreateCommandControls(commands),
@@ -59,29 +62,12 @@ namespace Trains.NET.Comet
                     new VStack()
                     {
                         new TrainControllerPanel(trainControls),
-                        new DrawableControl(controlDelegate)
+                        new DrawableControl(_controlDelegate)
                     }
                 }.FillHorizontal();
             };
 
-            _gameTimer = gameTimer;
-            _gameTimer.Elapsed += (s, e) =>
-            {
-                game.AdjustViewPortIfNecessary();
-
-                System.Threading.Tasks.Task.Run(game.DrawFrame);
-
-                controlDelegate.FlagDraw();
-                _miniMapDelegate.FlagDraw();
-
-                ThreadHelper.Run(async () =>
-                {
-                    await ThreadHelper.SwitchToMainThreadAsync();
-
-                    controlDelegate.Invalidate();
-                    _miniMapDelegate.Invalidate();
-                });
-            };
+            RenderLoop();
             _trackLayout = trackLayout;
             _gameStorage = gameStorage;
 
@@ -89,9 +75,23 @@ namespace Trains.NET.Comet
             {
                 trainControls.ToggleBuildMode();
 
-                if (controlDelegate == null) return;
+                if (_controlDelegate == null) return;
 
-                controlDelegate.CurrentTool.Value = tools.FirstOrDefault(t => ShouldShowTool(trainControls.BuildMode, t));
+                _controlDelegate.CurrentTool.Value = tools.FirstOrDefault(t => ShouldShowTool(trainControls.BuildMode, t));
+            }
+        }
+
+        async Task RenderLoop()
+        {
+            while (true)
+            {
+                _controlDelegate.FlagDraw();
+                _miniMapDelegate.FlagDraw();
+
+                _controlDelegate.Invalidate();
+                _miniMapDelegate.Invalidate();
+
+                await Task.Delay(TimeSpan.FromSeconds(1.0 / 60));
             }
         }
 
@@ -163,7 +163,7 @@ namespace Trains.NET.Comet
         {
             if (disposing)
             {
-                _gameTimer.Dispose();
+                _game.Dispose();
                 _miniMapDelegate.Dispose();
             }
             base.Dispose(disposing);
